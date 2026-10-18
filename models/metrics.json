@@ -1,0 +1,352 @@
+{
+  "data": {
+    "patients": 200,
+    "windows": 132800,
+    "days_per_patient": 7,
+    "sampling_minutes": 15,
+    "features": {
+      "total": 34,
+      "wearable": 18,
+      "ehr": 16
+    },
+    "label_counts": {
+      "0": 128086,
+      "1": 1012,
+      "2": 3702
+    },
+    "labels": {
+      "0": "no event in next 2 h (70-250 mg/dL)",
+      "1": "any CGM reading < 70 mg/dL in next 2 h",
+      "2": "any CGM reading > 250 mg/dL in next 2 h"
+    },
+    "cgm_readings_lt54": 35,
+    "cgm_readings_lt70": 409,
+    "patients_with_any_lt70": 37
+  },
+  "holdout": {
+    "split": "patient-level 75/25 (random_state=42); thresholds chosen on training patients only",
+    "test_patients": 50,
+    "windows": 33200,
+    "alert_thresholds": {
+      "hypo": 0.51,
+      "hyper": 0.52
+    },
+    "classifier": {
+      "confusion_matrix_rows_true_cols_alert": [
+        [
+          31040,
+          307,
+          838
+        ],
+        [
+          122,
+          336,
+          0
+        ],
+        [
+          77,
+          0,
+          480
+        ]
+      ],
+      "macro_f1": 0.7,
+      "hypo_lt70": {
+        "positives": 458,
+        "tp": 336,
+        "fp": 307,
+        "fn": 122,
+        "sensitivity": 0.734,
+        "specificity": 0.9906,
+        "precision": 0.523,
+        "roc_auc": 0.99,
+        "pr_auc": 0.621,
+        "prevalence": 0.0138
+      },
+      "hyper_gt250": {
+        "positives": 557,
+        "tp": 480,
+        "fp": 838,
+        "fn": 77,
+        "sensitivity": 0.862,
+        "specificity": 0.9743,
+        "precision": 0.364,
+        "roc_auc": 0.988,
+        "pr_auc": 0.774,
+        "prevalence": 0.0168
+      }
+    },
+    "classifier_not_already_in_event": {
+      "confusion_matrix_rows_true_cols_alert": [
+        [
+          31010,
+          284,
+          816
+        ],
+        [
+          107,
+          184,
+          0
+        ],
+        [
+          73,
+          0,
+          257
+        ]
+      ],
+      "macro_f1": 0.61,
+      "hypo_lt70": {
+        "positives": 291,
+        "tp": 184,
+        "fp": 284,
+        "fn": 107,
+        "sensitivity": 0.632,
+        "specificity": 0.9912,
+        "precision": 0.393,
+        "roc_auc": 0.987,
+        "pr_auc": 0.431,
+        "prevalence": 0.0089
+      },
+      "hyper_gt250": {
+        "positives": 330,
+        "tp": 257,
+        "fp": 816,
+        "fn": 73,
+        "sensitivity": 0.779,
+        "specificity": 0.9748,
+        "precision": 0.24,
+        "roc_auc": 0.981,
+        "pr_auc": 0.521,
+        "prevalence": 0.0101
+      }
+    },
+    "episodes_hypo": {
+      "episodes": 39,
+      "warned_15_to_120_min_ahead": 34,
+      "episode_sensitivity": 0.872,
+      "median_lead_time_min": 120.0,
+      "alarms_per_patient_day": 0.36,
+      "false_alarm_fraction": 0.691
+    },
+    "episodes_hyper": {
+      "episodes": 43,
+      "warned_15_to_120_min_ahead": 42,
+      "episode_sensitivity": 0.977,
+      "median_lead_time_min": 120.0,
+      "alarms_per_patient_day": 0.58,
+      "false_alarm_fraction": 0.881
+    },
+    "rule_baseline_events": {
+      "confusion_matrix_rows_true_cols_alert": [
+        [
+          30575,
+          383,
+          1227
+        ],
+        [
+          262,
+          196,
+          0
+        ],
+        [
+          330,
+          0,
+          227
+        ]
+      ],
+      "macro_f1": 0.523,
+      "hypo_lt70": {
+        "positives": 458,
+        "tp": 196,
+        "fp": 383,
+        "fn": 262,
+        "sensitivity": 0.428,
+        "specificity": 0.9883,
+        "precision": 0.339,
+        "roc_auc": 0.708,
+        "pr_auc": 0.153,
+        "prevalence": 0.0138
+      },
+      "hyper_gt250": {
+        "positives": 557,
+        "tp": 227,
+        "fp": 1227,
+        "fn": 330,
+        "sensitivity": 0.408,
+        "specificity": 0.9624,
+        "precision": 0.156,
+        "roc_auc": 0.685,
+        "pr_auc": 0.074,
+        "prevalence": 0.0168
+      }
+    },
+    "regressor": {
+      "mae": 11.0,
+      "rmse": 16.44,
+      "r2": 0.803,
+      "clarke_pct": {
+        "A": 91.81,
+        "B": 7.58,
+        "C": 0.0,
+        "D": 0.61,
+        "E": 0.0
+      }
+    },
+    "baseline_persistence": {
+      "mae": 20.77,
+      "rmse": 28.01,
+      "r2": 0.428,
+      "clarke_pct": {
+        "A": 79.08,
+        "B": 19.69,
+        "C": 0.0,
+        "D": 1.23,
+        "E": 0.0
+      }
+    },
+    "baseline_linear_extrapolation": {
+      "mae": 35.2,
+      "rmse": 51.17,
+      "r2": -0.908,
+      "clarke_pct": {
+        "A": 59.9,
+        "B": 34.43,
+        "C": 4.1,
+        "D": 1.38,
+        "E": 0.19
+      }
+    },
+    "ehr_swap_test": {
+      "description": "held-out patients scored with a shuffled patient's EHR; worse scores mean the model uses the EHR",
+      "regressor_mae": 16.13,
+      "hypo_pr_auc": 0.435,
+      "hyper_pr_auc": 0.646
+    }
+  },
+  "grouped_cv_5fold": {
+    "folds": 5,
+    "grouping": "patient",
+    "note": "uses the shipped alert thresholds (chosen on the 150 training patients)",
+    "classifier": {
+      "confusion_matrix_rows_true_cols_alert": [
+        [
+          123945,
+          1296,
+          2845
+        ],
+        [
+          248,
+          764,
+          0
+        ],
+        [
+          648,
+          0,
+          3054
+        ]
+      ],
+      "macro_f1": 0.705,
+      "hypo_lt70": {
+        "positives": 1012,
+        "tp": 764,
+        "fp": 1296,
+        "fn": 248,
+        "sensitivity": 0.755,
+        "specificity": 0.9902,
+        "precision": 0.371,
+        "roc_auc": 0.987,
+        "pr_auc": 0.548,
+        "prevalence": 0.0076
+      },
+      "hyper_gt250": {
+        "positives": 3702,
+        "tp": 3054,
+        "fp": 2845,
+        "fn": 648,
+        "sensitivity": 0.825,
+        "specificity": 0.978,
+        "precision": 0.518,
+        "roc_auc": 0.987,
+        "pr_auc": 0.82,
+        "prevalence": 0.0279
+      }
+    },
+    "regressor": {
+      "mae": 11.08,
+      "rmse": 16.7,
+      "r2": 0.806,
+      "clarke_pct": {
+        "A": 91.58,
+        "B": 8.06,
+        "C": 0.0,
+        "D": 0.36,
+        "E": 0.0
+      }
+    },
+    "baseline_persistence": {
+      "mae": 20.95,
+      "rmse": 28.44,
+      "r2": 0.437,
+      "clarke_pct": {
+        "A": 78.87,
+        "B": 20.1,
+        "C": 0.0,
+        "D": 1.03,
+        "E": 0.0
+      }
+    }
+  },
+  "ablation_grouped_cv_5fold": {
+    "fused_all_features": {
+      "features": 34,
+      "regressor_mae": 11.08,
+      "hypo_pr_auc": 0.548,
+      "hyper_pr_auc": 0.82
+    },
+    "wearables_only": {
+      "features": 18,
+      "regressor_mae": 11.45,
+      "hypo_pr_auc": 0.53,
+      "hyper_pr_auc": 0.855
+    },
+    "ehr_only_plus_hour": {
+      "features": 17,
+      "regressor_mae": 15.91,
+      "hypo_pr_auc": 0.206,
+      "hyper_pr_auc": 0.266
+    },
+    "without_cgm": {
+      "features": 29,
+      "regressor_mae": 14.55,
+      "hypo_pr_auc": 0.426,
+      "hyper_pr_auc": 0.452
+    },
+    "without_hr_hrv_sleep": {
+      "features": 29,
+      "regressor_mae": 11.07,
+      "hypo_pr_auc": 0.55,
+      "hyper_pr_auc": 0.823
+    },
+    "without_history_and_genetics": {
+      "features": 31,
+      "regressor_mae": 11.1,
+      "hypo_pr_auc": 0.555,
+      "hyper_pr_auc": 0.825
+    },
+    "without_hour_of_day": {
+      "features": 33,
+      "regressor_mae": 13.86,
+      "hypo_pr_auc": 0.509,
+      "hyper_pr_auc": 0.76
+    }
+  },
+  "latency": {
+    "single_window_ms_median": 14.59,
+    "single_window_ms_p95": 21.71,
+    "batched_us_per_window": 8.4,
+    "hardware_note": "CPU only; measured on the machine that ran this script"
+  },
+  "notes": [
+    "All data is synthetic (data/generate_datasets.py); results do not transfer to real patients.",
+    "Classifier probabilities are not calibrated; the dashboards label them as risk scores."
+  ]
+}
