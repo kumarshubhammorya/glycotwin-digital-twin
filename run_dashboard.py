@@ -1,28 +1,45 @@
 """
-Runner script for GlycoTwin Streamlit Dashboard
-Starts the clinical portal directly in headless mode.
+Launch the GlycoTwin Streamlit doctor dashboard.
+
+    python run_dashboard.py            # http://localhost:8501
+    python run_dashboard.py 8601       # another port
+
+Works from any working directory (paths resolve from this file). Equivalent to
+`streamlit run dashboard/app.py` from the repository root, plus the teal theme.
+Synthetic data only. Research prototype, not a medical device.
 """
-import os
 import sys
+from pathlib import Path
 
-# Ensure headless settings
-os.environ["STREAMLIT_SERVER_HEADLESS"] = "true"
-os.environ["STREAMLIT_SERVER_PORT"] = "8501"
-os.environ["STREAMLIT_SERVER_ADDRESS"] = "localhost"
-os.environ["STREAMLIT_BROWSER_GATHER_USAGE_STATS"] = "false"
+ROOT = Path(__file__).resolve().parent
+APP = ROOT / "dashboard" / "app.py"
 
-from streamlit.web import bootstrap
+REQUIRED = {
+    "data/synthetic_ehr.csv": "python data/generate_datasets.py",
+    "data/synthetic_wearables.csv": "python data/generate_datasets.py",
+    "models/glycotwin_model.joblib": "python models/train_fusion_model.py",
+    "models/metrics.json": "python models/evaluate.py",
+}
+
 
 def main():
-    script_path = os.path.join(os.path.dirname(__file__), "dashboard", "app.py")
-    flag_options = {
-        "server.port": 8501,
-        "server.headless": True,
-        "server.address": "localhost",
-        "browser.gatherUsageStats": False,
-    }
-    print("Launching GlycoTwin Clinical Dashboard on http://localhost:8501 ...")
-    bootstrap.run(script_path, False, [], flag_options)
+    port = sys.argv[1] if len(sys.argv) > 1 else "8501"
+    missing = [(p, cmd) for p, cmd in REQUIRED.items() if not (ROOT / p).exists()]
+    for p, cmd in missing:
+        print(f"[warning] {p} is missing. Create it with: {cmd}")
+
+    from streamlit.web import cli as stcli
+
+    sys.argv = [
+        "streamlit", "run", str(APP),
+        "--server.port", str(port),
+        "--server.headless", "true",
+        "--browser.gatherUsageStats", "false",
+        "--theme.primaryColor", "#0D9488",
+    ]
+    print(f"Launching GlycoTwin dashboard on http://localhost:{port} ...")
+    sys.exit(stcli.main())
+
 
 if __name__ == "__main__":
     main()

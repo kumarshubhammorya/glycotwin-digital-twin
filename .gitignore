@@ -2,14 +2,35 @@
 __pycache__/
 *.py[cod]
 *$py.class
-.venv*
-.firebase/
-env/
-venv/
-*.log
+.pytest_cache/
+.ipynb_checkpoints/
 
-# Streamlit
+# Virtual environments
+.venv*/
+.venv*
+venv/
+env/
+
+# Firebase CLI cache (firebase.json and .firebaserc stay committed)
+.firebase/
+firebase-debug.log*
+
+# Streamlit local config / secrets
 .streamlit/
+
+# Office lock files and temporary exports
+~$*
+docs/~$*
+*.tmp
+.~lock.*#
+
+# Editors and assistants
+.vscode/
+.idea/
+.claude/
+
+# Logs
+*.log
 
 # OS
 .DS_Store

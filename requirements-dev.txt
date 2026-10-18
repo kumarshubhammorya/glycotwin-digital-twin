@@ -1,0 +1,6 @@
+# Extra tools for regenerating the slide deck and architecture diagram (generate_summit_docs.py)
+# and for checking the exported PDFs. Not needed to run the model or the dashboards.
+# LibreOffice (soffice) is used separately to export the PPTX files to PDF.
+-r requirements.txt
+python-pptx==1.0.*
+pypdf==6.21.*

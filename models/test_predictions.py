@@ -1,185 +1,204 @@
 """
-GlycoTwin: Automated Clinical Validation & Stress Testing Suite
-Tests the trained AI model against 3 critical clinical stress scenarios
-and validates holdout patient cohort metrics.
+GlycoTwin: prediction checks for the shipped model bundle.
+
+Run from anywhere:  python models/test_predictions.py
+
+Read-only: loads data/*.csv, models/glycotwin_model.joblib and models/metrics.json,
+and writes nothing (no model, no metrics, no bytecode cache). Every check uses the
+same helpers as training and the dashboards (compute_wearable_features ->
+prepare_fused_dataset -> encode_features -> apply_alert_thresholds).
+
+Checks
+  (a) The metrics stored in the bundle, and the held-out numbers in
+      models/metrics.json, match a fresh re-score of the 50 held-out patients.
+  (b) IND-PAT-196 (held out, sulfonylurea): a hypoglycaemia alert fires in the
+      2 h before its first CGM reading < 70 mg/dL, while CGM is still >= 70.
+  (c) IND-PAT-077 (held out): a hyperglycaemia alert fires in the 2 h before
+      its first CGM reading > 250 mg/dL, while CGM is still <= 250.
+  (d) IND-PAT-046 (held out, stable): no alert on any stable window
+      (no event in the next 2 h, CGM 80-160 mg/dL, change <= 3 mg/dL per 15 min).
+  (e) encode_features maps every category that appears in the CSVs to a
+      non-negative code, and the bundle stores the same category levels.
+
+Prints PASS/FAIL per check and exits with status 1 if any check fails.
+Synthetic data only. Research prototype, not a medical device.
 """
 
+import json
 import os
-import joblib
-import pandas as pd
-import numpy as np
+import sys
 
-def run_tests():
-    model_path = "models/glycotwin_model.joblib"
-    if not os.path.exists(model_path):
-        print(" Error: Model file not found at models/glycotwin_model.joblib. Please train first.")
-        return
+sys.dont_write_bytecode = True  # keep the run read-only (no __pycache__)
 
-    print("Loading trained GlycoTwin AI Model bundle...")
-    package = joblib.load(model_path)
-    clf = package["classifier"]
-    reg = package["regressor"]
-    feature_cols = package["feature_cols"]
+import joblib  # noqa: E402
+import numpy as np  # noqa: E402
+import pandas as pd  # noqa: E402
+from sklearn.metrics import (average_precision_score, f1_score, mean_absolute_error,  # noqa: E402
+                             r2_score, roc_auc_score)
 
-    print(" Model loaded successfully!\n")
-    print("=" * 70)
-    print("🧪 RUNNING CLINICAL SCENARIO STRESS TESTS")
-    print("=" * 70)
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.join(ROOT, "models"))
+from train_fusion_model import (CATEGORY_LEVELS, HYPER_MG_DL, HYPO_MG_DL,  # noqa: E402
+                                apply_alert_thresholds, compute_wearable_features,
+                                encode_features, load_data, prepare_fused_dataset)
 
-    # --- TEST CASE 1: Impending Hypoglycemia Crash ---
-    # Scenario: Elderly patient on Insulin + Sulfonylurea, took insulin, walked 2,400 steps, zero carbs
-    test_1 = {
-        "glucose_cgm": [85.0],
-        "glucose_velocity_15m": [-4.5], # rapid drop
-        "glucose_velocity_30m": [-8.0],
-        "glucose_mean_1h": [95.0],
-        "glucose_std_1h": [6.2],
-        "heart_rate": [124],
-        "hr_mean_1h": [118.0],
-        "hrv": [22], # sympathetic activation
-        "hrv_mean_1h": [25.0],
-        "steps_15m": [1200],
-        "steps_sum_1h": [2400],
-        "steps_sum_2h": [3200],
-        "meal_carbs_g": [0],
-        "carbs_sum_2h": [0],
-        "insulin_units": [6],
-        "insulin_sum_2h": [14],
-        "hour_of_day": [18],
-        "sleep_stage": [0], # Awake
-        "age": [66],
-        "gender": [0], # Female
-        "bmi": [28.2],
-        "diabetes_duration_years": [12.0],
-        "baseline_hba1c": [8.4],
-        "fasting_glucose_mg_dl": [140],
-        "systolic_bp": [138],
-        "diastolic_bp": [84],
-        "egfr": [68.0],
-        "diet_profile": [0],
-        "primary_medication": [2],
-        "insulin_regimen": [1],
-        "clinical_risk_tier": [2] # High Risk
-    }
-    df1 = pd.DataFrame(test_1)[feature_cols]
-    pred_g1 = reg.predict(df1)[0]
-    pred_cls1 = clf.predict(df1)[0]
+BUNDLE_PATH = os.path.join(ROOT, "models", "glycotwin_model.joblib")
+METRICS_PATH = os.path.join(ROOT, "models", "metrics.json")
+HORIZON = 8  # 8 x 15 min = 2 h
 
-    print("\n[TEST 1] IMPENDING HYPOGLYCEMIA SCENARIO")
-    print(" Clinical Profile: 66yo female, high insulin on board + recent 2,400 steps, zero food.")
-    print(f" Current Glucose: 85.0 mg/dL (Velocity: -4.5 mg/dL/15m)")
-    print(f" -> 2-Hour Forecast Glucose: {pred_g1:.1f} mg/dL")
-    print(f" -> Predicted Event Class: {pred_cls1} (0=In-Range, 1=Hypo <70, 2=Hyper >250)")
-    if pred_g1 < 70.0 or pred_cls1 == 1:
-        print(" PASS: Model successfully triggered early Hypoglycemia Warning!")
+results = []
+
+
+def check(name, ok, detail):
+    results.append(bool(ok))
+    print(f"[{'PASS' if ok else 'FAIL'}] {name}")
+    for line in detail:
+        print(f"       {line}")
+
+
+def close(a, b, tol):
+    return a is not None and b is not None and abs(float(a) - float(b)) <= tol
+
+
+def first_onset(frame, cond):
+    """Row position of the first reading that meets cond, or None."""
+    hits = np.flatnonzero(cond(frame["glucose_cgm"].to_numpy()))
+    return int(hits[0]) if len(hits) else None
+
+
+def early_warning(frame, pid, k, cond, label):
+    """Is a class-k alert raised 15-120 min before the patient's first out-of-range reading?"""
+    g = frame[frame["patient_id"] == pid].reset_index(drop=True)
+    if g.empty:
+        return False, [f"{pid} not found in the held-out data"]
+    s = first_onset(g, cond)
+    if s is None:
+        return False, [f"{pid} has no {label} reading in the data"]
+    lo = max(0, s - HORIZON)
+    pre = g.iloc[lo:s]
+    hits = pre[(pre["alert"] == k) & ~cond(pre["glucose_cgm"].to_numpy())]
+    detail = [f"first {label} reading: {g.loc[s, 'timestamp']} at {g.loc[s, 'glucose_cgm']:.1f} mg/dL"]
+    if s < HORIZON:
+        detail.append(f"only {s} windows of history before it (less than 2 h)")
+    if len(hits):
+        t0 = hits.iloc[0]
+        lead = (s - hits.index[0]) * 15
+        detail.append(f"first alert: {t0['timestamp']} (CGM {t0['glucose_cgm']:.1f} mg/dL, "
+                      f"risk score {t0['score']:.2f}), {lead} min before the first {label} reading")
+        detail.append(f"{len(hits)} of {len(pre)} windows in the preceding 2 h carried this alert")
     else:
-        print(" ATTENTION: Forecast fell slightly outside threshold.")
+        detail.append(f"no {label} alert in the {len(pre)} windows before it")
+    return len(hits) > 0, detail
 
-    # --- TEST CASE 2: Severe Postprandial Hyperglycemia Spike ---
-    # Scenario: 80g high-carb Indian dinner, missed insulin, sedentary
-    test_2 = {
-        "glucose_cgm": [190.0],
-        "glucose_velocity_15m": [+8.5], # rapid spike
-        "glucose_velocity_30m": [+15.0],
-        "glucose_mean_1h": [170.0],
-        "glucose_std_1h": [12.4],
-        "heart_rate": [78],
-        "hr_mean_1h": [76.0],
-        "hrv": [40],
-        "hrv_mean_1h": [42.0],
-        "steps_15m": [40],
-        "steps_sum_1h": [120],
-        "steps_sum_2h": [200],
-        "meal_carbs_g": [80],
-        "carbs_sum_2h": [80],
-        "insulin_units": [0], # Missed dose
-        "insulin_sum_2h": [0],
-        "hour_of_day": [21],
-        "sleep_stage": [0],
-        "age": [52],
-        "gender": [1], # Male
-        "bmi": [31.5],
-        "diabetes_duration_years": [8.0],
-        "baseline_hba1c": [9.6],
-        "fasting_glucose_mg_dl": [185],
-        "systolic_bp": [142],
-        "diastolic_bp": [88],
-        "egfr": [74.0],
-        "diet_profile": [0],
-        "primary_medication": [1],
-        "insulin_regimen": [0],
-        "clinical_risk_tier": [1]
-    }
-    df2 = pd.DataFrame(test_2)[feature_cols]
-    pred_g2 = reg.predict(df2)[0]
-    pred_cls2 = clf.predict(df2)[0]
 
-    print("\n[TEST 2] SEVERE POSTPRANDIAL HYPERGLYCEMIC SPIKE")
-    print(" Clinical Profile: 52yo male, 80g carb meal + missed insulin + sedentary.")
-    print(f" Current Glucose: 190.0 mg/dL (Velocity: +8.5 mg/dL/15m)")
-    print(f" -> 2-Hour Forecast Glucose: {pred_g2:.1f} mg/dL")
-    print(f" -> Predicted Event Class: {pred_cls2} (0=In-Range, 1=Hypo <70, 2=Hyper >250)")
-    if pred_g2 > 230.0 or pred_cls2 == 2:
-        print(" PASS: Model successfully flagged impending Severe Hyperglycemic Spike!")
-    else:
-        print(" ATTENTION: Forecast fell slightly outside threshold.")
+def main():
+    for p in (BUNDLE_PATH, METRICS_PATH):
+        if not os.path.exists(p):
+            print(f"[FAIL] missing {os.path.relpath(p, ROOT)}. Run models/train_fusion_model.py "
+                  f"and models/evaluate.py first.")
+            sys.exit(1)
 
-    # --- TEST CASE 3: Stable In-Range Metabolic Balance ---
-    # Scenario: Balanced vegetarian meal, Metformin, light evening walk
-    test_3 = {
-        "glucose_cgm": [115.0],
-        "glucose_velocity_15m": [+0.5],
-        "glucose_velocity_30m": [+1.0],
-        "glucose_mean_1h": [114.0],
-        "glucose_std_1h": [2.1],
-        "heart_rate": [72],
-        "hr_mean_1h": [74.0],
-        "hrv": [45],
-        "hrv_mean_1h": [44.0],
-        "steps_15m": [150],
-        "steps_sum_1h": [600],
-        "steps_sum_2h": [1100],
-        "meal_carbs_g": [35],
-        "carbs_sum_2h": [35],
-        "insulin_units": [0],
-        "insulin_sum_2h": [0],
-        "hour_of_day": [11],
-        "sleep_stage": [0],
-        "age": [42],
-        "gender": [1],
-        "bmi": [24.1],
-        "diabetes_duration_years": [2.5],
-        "baseline_hba1c": [6.4],
-        "fasting_glucose_mg_dl": [108],
-        "systolic_bp": [118],
-        "diastolic_bp": [76],
-        "egfr": [98.0],
-        "diet_profile": [2],
-        "primary_medication": [0],
-        "insulin_regimen": [0],
-        "clinical_risk_tier": [0] # Low Risk
-    }
-    df3 = pd.DataFrame(test_3)[feature_cols]
-    pred_g3 = reg.predict(df3)[0]
-    pred_cls3 = clf.predict(df3)[0]
+    bundle = joblib.load(BUNDLE_PATH)
+    with open(METRICS_PATH) as f:
+        metrics = json.load(f)
+    clf, reg = bundle["classifier"], bundle["regressor"]
+    cols, thresholds = bundle["feature_cols"], bundle["alert_thresholds"]
 
-    print("\n[TEST 3] STABLE METABOLIC IN-RANGE BALANCE")
-    print(" Clinical Profile: 42yo newly diagnosed, balanced diet on Metformin.")
-    print(f" Current Glucose: 115.0 mg/dL (Velocity: +0.5 mg/dL/15m)")
-    print(f" -> 2-Hour Forecast Glucose: {pred_g3:.1f} mg/dL")
-    print(f" -> Predicted Event Class: {pred_cls3} (0=In-Range, 1=Hypo <70, 2=Hyper >250)")
-    if 70.0 <= pred_g3 <= 180.0 and pred_cls3 == 0:
-        print(" PASS: Model confirms stable, safe in-range glycemic control.")
-    else:
-        print(" ATTENTION: Forecast fell slightly outside target range.")
+    ehr, wear = load_data(os.path.join(ROOT, "data"))
+    test_ids = set(bundle["test_patients"])
+    print(f"Bundle: {len(cols)} features, alert thresholds {thresholds}, "
+          f"{len(bundle['train_patients'])} training / {len(test_ids)} held-out patients\n")
 
-    print("\n" + "=" * 70)
-    print(" SUMMARY METRICS FROM HOLDOUT TEST PATIENTS")
-    print("=" * 70)
-    print(f" Mean Absolute Error (MAE): {package['metrics']['mae']:.2f} mg/dL")
-    print(f" R-squared Score (R2):      {package['metrics']['r2']:.3f}")
-    print(f" Macro F1-Score:            {package['metrics']['macro_f1']:.3f}")
-    print("\nAll automated validation tests passed successfully!")
+    # Score the held-out patients only (features are computed per patient, so this
+    # gives exactly the rows evaluate.py scores).
+    held = wear[wear["patient_id"].isin(test_ids)]
+    fused, _ = prepare_fused_dataset(ehr, compute_wearable_features(held))
+    fused = fused.sort_values(["patient_id", "timestamp"]).reset_index(drop=True)
+    X = encode_features(fused, cols)
+    proba = clf.predict_proba(X)
+    alerts = apply_alert_thresholds(proba, thresholds)
+    pred = reg.predict(X)
+    y = fused["adverse_event_2h"].to_numpy()
+    yr = fused["future_glucose_2h"].to_numpy()
+    fused["alert"] = alerts
+
+    # ---------- (a) stored metrics == fresh re-score ----------
+    mae, r2 = mean_absolute_error(yr, pred), r2_score(yr, pred)
+    f1 = f1_score(y, alerts, average="macro")
+    stored = bundle["metrics"]
+    h = metrics["holdout"]
+    rows = [
+        ("bundle holdout_mae", mae, stored.get("holdout_mae"), 0.006),
+        ("bundle holdout_r2", r2, stored.get("holdout_r2"), 0.0006),
+        ("bundle holdout_macro_f1_alerts", f1, stored.get("holdout_macro_f1_alerts"), 0.0006),
+        ("metrics.json regressor mae", mae, h["regressor"]["mae"], 0.006),
+        ("metrics.json regressor r2", r2, h["regressor"]["r2"], 0.0006),
+        ("metrics.json held-out windows", len(fused), h["windows"], 0),
+    ]
+    for k, key in ((1, "hypo_lt70"), (2, "hyper_gt250")):
+        yb, ab = (y == k), (alerts == k)
+        tp, fp, fn = int((yb & ab).sum()), int((~yb & ab).sum()), int((yb & ~ab).sum())
+        m = h["classifier"][key]
+        rows += [
+            (f"metrics.json {key} sensitivity", tp / max(tp + fn, 1), m["sensitivity"], 0.0006),
+            (f"metrics.json {key} precision", tp / max(tp + fp, 1), m["precision"], 0.0006),
+            (f"metrics.json {key} ROC-AUC", roc_auc_score(yb, proba[:, k]), m["roc_auc"], 0.0006),
+            (f"metrics.json {key} PR-AUC", average_precision_score(yb, proba[:, k]), m["pr_auc"], 0.0006),
+        ]
+    ok = all(close(a, b, tol) for _, a, b, tol in rows) and thresholds == h["alert_thresholds"]
+    detail = [f"{n}: re-scored {a if isinstance(a, int) else round(float(a), 4)} vs stored {b}"
+              + ("" if close(a, b, tol) else "  <-- mismatch") for n, a, b, tol in rows]
+    detail.append(f"alert thresholds: bundle {thresholds} vs metrics.json {h['alert_thresholds']}")
+    check("(a) stored metrics match a re-score of the held-out set", ok, detail)
+
+    # ---------- (b) hypo early warning for IND-PAT-196 ----------
+    fused["score"] = proba[:, 1]
+    ok, detail = early_warning(fused, "IND-PAT-196", 1, lambda g: g < HYPO_MG_DL, "<70 mg/dL")
+    check("(b) IND-PAT-196: hypo alert within 2 h before the first <70 mg/dL reading", ok, detail)
+
+    # ---------- (c) hyper early warning for IND-PAT-077 ----------
+    fused["score"] = proba[:, 2]
+    ok, detail = early_warning(fused, "IND-PAT-077", 2, lambda g: g > HYPER_MG_DL, ">250 mg/dL")
+    check("(c) IND-PAT-077: hyper alert within 2 h before the first >250 mg/dL reading", ok, detail)
+
+    # ---------- (d) no alert on stable windows of IND-PAT-046 ----------
+    g = fused[fused["patient_id"] == "IND-PAT-046"]
+    stable = g[(g["adverse_event_2h"] == 0) & g["glucose_cgm"].between(80, 160)
+               & (g["glucose_velocity_15m"].abs() <= 3)]
+    n_alert = int((stable["alert"] != 0).sum())
+    ok = len(stable) > 0 and n_alert == 0
+    detail = [f"{len(stable)} stable windows, {n_alert} with an alert",
+              f"all IND-PAT-046 windows: {int((g['alert'] != 0).sum())} alerts in {len(g)}"]
+    if len(stable):
+        pidx = stable.index
+        detail.append(f"highest risk scores on stable windows: hypo {proba[pidx, 1].max():.3f}, "
+                      f"hyper {proba[pidx, 2].max():.3f} (thresholds {thresholds['hypo']} / {thresholds['hyper']})")
+    check("(d) IND-PAT-046: no alert on stable windows", ok, detail)
+
+    # ---------- (e) every CSV category gets a non-negative code ----------
+    all_fused, _ = prepare_fused_dataset(ehr, wear)
+    detail, ok = [], True
+    for c, levels in CATEGORY_LEVELS.items():
+        uniq = all_fused[[c]].drop_duplicates().reset_index(drop=True)
+        codes = encode_features(uniq, [c])[c].to_numpy(dtype=float)
+        bad = [v for v, code in zip(uniq[c].astype(str), codes) if np.isnan(code) or code < 0]
+        ok &= not bad
+        detail.append(f"{c}: {len(uniq)} distinct values in the CSVs, {len(levels)} known levels"
+                      + (f", UNMAPPED {bad}" if bad else ", all mapped"))
+    text_cols = [c for c in cols if not pd.api.types.is_numeric_dtype(fused[c])]
+    uncovered = [c for c in text_cols if c not in CATEGORY_LEVELS]
+    ok &= not uncovered
+    detail.append(f"text-valued model features: {len(text_cols)}, "
+                  + (f"WITHOUT category levels: {uncovered}" if uncovered else "all have fixed category levels"))
+    same = bundle.get("category_levels") == CATEGORY_LEVELS
+    ok &= same
+    detail.append("bundle category_levels " + ("match" if same else "DIFFER FROM") + " train_fusion_model.CATEGORY_LEVELS")
+    check("(e) encode_features maps every CSV category to a non-negative code", ok, detail)
+
+    n_fail = results.count(False)
+    print(f"\n{len(results) - n_fail} of {len(results)} checks passed.")
+    sys.exit(1 if n_fail else 0)
+
 
 if __name__ == "__main__":
-    run_tests()
+    main()

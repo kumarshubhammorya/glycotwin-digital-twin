@@ -1,194 +1,136 @@
-# 🧬 GlycoTwin: Plain-Language Guide & Architecture Explained
+# GlycoTwin explained in plain language
 
-> **A non-technical, comprehensive guide to how GlycoTwin turns wearable sensor data and medical records into a 2-hour early warning system and "flight simulator" for Type 2 Diabetes.**
+A guide for readers without a machine-learning background: what GlycoTwin is, what it shows a doctor, how it works, how well it does, and what it cannot do.
 
----
-
-## 1. What is GlycoTwin? (The Big Picture)
-
-Imagine driving a car down a winding road at night with the headlights turned off, and the only way you know where you are is by checking the rear-view mirror every few hours. 
-
-For decades, that is exactly how people have managed diabetes:
-* You wait until you feel dizzy, sweaty, or exhausted.
-* You prick your finger to see your blood sugar number.
-* By the time you see the number, your body is **already** in a medical crisis (either a dangerous low or an extreme high).
-
-**GlycoTwin turns the headlights on.** 
-
-It is an AI-powered **"Digital Twin"**—a virtual, mathematical replica of an individual patient's unique metabolism. Just like aerospace engineers create a digital simulation of an aircraft to test flight turbulence before taking off, GlycoTwin creates a digital simulation of a patient's body to forecast their blood sugar **2 hours into the future**.
-
-```
-                EPISODIC CARE (Traditional)
-                [Finger Prick] ------------> [Blind 4-6 Hours] ------------> [Dizzy / Crash]
-                                                                                (Too late)
-
-                GLYCOTWIN (Digital Twin)
-                [Wearables + EHR] ===> [AI Prediction Engine] ===> [2-Hour Early Warning]
-                                                                     "Juice now: prevents crash"
-```
+> Synthetic data only. Research prototype, not a medical device. Not for diagnosis or dosing decisions.
+> The numbers below come from [`../models/metrics.json`](../models/metrics.json), which `models/evaluate.py` writes.
 
 ---
 
-## 2. The Real-World Problem It Solves
+## 1. The idea in one paragraph
 
-India is often called the **"Diabetes Capital of the World"**:
-* Over **101 million people** in India have Type 2 Diabetes.
-* Another **136 million people** are pre-diabetic.
-* Indian bodies typically develop diabetes at younger ages and at lower body weights (lower BMI) compared to Western populations due to genetic and dietary factors (high-carbohydrate staple diets like white rice and wheat flatbreads).
+Imagine driving at night and only being able to check the road behind you every few hours. Diabetes care can feel like that: a clinic visit every few months and occasional finger-prick checks. A continuous glucose monitor (CGM) shows the road behind you all the time, but someone still has to notice when it is curving towards trouble. GlycoTwin tries to look a little way ahead. Every 15 minutes it combines what is known about the person (their medical record) with what their sensors have just recorded, and estimates whether their glucose is likely to go **below 70 mg/dL** or **above 250 mg/dL** in the next 2 hours. It also gives a single best guess of the glucose value 2 hours from now.
 
-In daily life, the two biggest dangers are:
-
-1. **Severe Hypoglycemia (Sugar Drop $< 70$ mg/dL)**:
-   * **What happens**: The brain runs out of fuel. Patients feel shaky, confused, can faint, fall, suffer seizures, or slip into a coma.
-   * **Why it happens**: Taking insulin or diabetes medicine but skipping a meal, walking too long, or unexpected metabolism changes.
-2. **Severe Hyperglycemia (Sugar Spike $> 250$ mg/dL)**:
-   * **What happens**: Toxic amounts of glucose circulate in the blood. Over time, this damages blood vessels in the eyes (blindness), kidneys (dialysis), heart, and nerves.
-
-**GlycoTwin stops these events before they happen** by alerting patients and doctors while glucose is still normal, providing an exact rescue action (like drinking 150ml of fruit juice or taking a 15-minute walk).
+We call it a "digital twin" because each patient's predictions are shaped by that patient's own record and recent data. It is a data-driven twin: a statistical model learned from data, not a mechanistic simulation of the body. A model-based "what if" (asking the trained model how its prediction changes if the meal or the walk were different) is the next step; today's What-If Sandbox uses simple hand-set rules instead.
 
 ---
 
-## 3. The Four Core Features (What You See on Screen)
+## 2. Why it matters in India
 
-The GlycoTwin dashboard is organized into four interactive modules:
+- In 2021 an estimated **101 million people in India had diabetes** and **136 million had prediabetes** (ICMR-INDIAB-17, Anjana et al., *Lancet Diabetes Endocrinol* 2023). That figure counts diabetes found by testing, including people who did not yet know they had it.
+- South Asian people tend to develop Type 2 diabetes at a lower body weight. One large study found that a BMI of about 23.9 in South Asian adults carried the same diabetes risk as a BMI of 30 in white adults (Caleyachetty et al., *Lancet Diabetes Endocrinol* 2021).
+- Two short-term dangers:
+  - **Low glucose (hypoglycaemia).** Below 70 mg/dL is "Level 1" and below 54 mg/dL is "Level 2" (American Diabetes Association). People can feel shaky, sweaty or confused, and severe lows can cause falls or loss of consciousness. In Type 2 diabetes, lows are mostly caused by sulfonylurea tablets (such as gliclazide or glimepiride) or insulin, especially when a meal is skipped, and they are more likely in older people.
+  - **Very high glucose (marked hyperglycaemia).** Readings above 250 mg/dL. Spending a lot of time this high adds to long-term damage to the eyes, kidneys, nerves and heart. The international time-in-range consensus suggests most adults aim for more than 70% of readings between 70 and 180 mg/dL.
+
+---
+
+## 3. What the doctor sees
+
+The Streamlit dashboard (`dashboard/app.py`) has five screens. The standalone web page (`dashboard/index.html`, hosted at https://glycotwin-app.web.app) has the same five screens for a few demo patients, with the model's outputs computed in advance. The two differ in some details, noted below.
+
+| Screen | What it shows |
+| :--- | :--- |
+| **Live Monitor** | One patient: their record (age, medicines, HbA1c, kidney function and so on); charts of the last 8 hours of glucose and of the model's two risk scores; the current heart rate and HRV, steps (last 15 minutes, 1 hour and 2 hours), sleep stage, and carbohydrates and insulin logged in the last 2 hours; the current glucose and its trend, the 2-hour forecast and any alert. A time slider replays the 7 days of synthetic data in 15-minute steps. For patients the model never saw in training, it can also show what actually happened next, so you can judge the alert. |
+| **What-If Sandbox** | "What if this meal were bigger, or followed by a walk?" A small set of hand-written rules draws a baseline curve and a "scenario" curve. It is **not** the machine-learning model and is not a dosing tool; it is for talking through lifestyle choices. The two dashboards use different rules. In Streamlit the baseline drifts back towards the patient's fasting glucose, and a meal raises glucose more for a higher BMI. On the standalone page the baseline is a straight line to the model's 2-hour forecast, and a walk lowers glucose more for people on a sulfonylurea or insulin. So the same scenario can give quite different curves on the two pages. |
+| **Data Ingest** | Upload a CGM or wearable CSV file. It runs five checks (are the right columns there? are there gaps? are values in a plausible range? are there impossible jumps? how much is missing?). In the Streamlit app, a file in the full GlycoTwin format is also scored by the model. |
+| **Cohort & Risk Board** | All 200 synthetic patients, ranked by the model's current risk scores, so the few who need attention now are at the top. |
+| **Model Card** | How well the model did, how that was measured, and its limitations. |
+
+What the alert says depends on the situation:
+
+- **Glucose below 70 mg/dL right now.** The standard advice applies: 15 g of fast-acting carbohydrate, then recheck in 15 minutes (ADA "15-15 rule").
+- **Low predicted but glucose still in range.** "Consider a snack and review medication timing with the care team."
+- **High predicted.** A prompt to review the recent meal, missed doses and hydration with the care team.
+
+GlycoTwin never suggests an insulin dose.
+
+---
+
+## 4. How it works, step by step
 
 ```mermaid
 flowchart LR
-    A["🧬 GlycoTwin Platform"] --> B["1. Live Monitor"]
-    A --> C["2. What-If Simulator"]
-    A --> D["3. Data Ingest"]
-    A --> E["4. Cohort Analytics"]
-    
-    B --> B1["• Real-time CGM gauge\n• 2h Early Warning\n• Confidence score (e.g. 93%)"]
-    C --> C1["• Virtual food & walk test\n• Time-in-range impact\n• Hypo risk preview"]
-    D --> D1["• Abbott/Dexcom import\n• 5-step data validation\n• Sensor health check"]
-    E --> E1["• 200-patient population\n• High-risk flag registry\n• ADA 7.0% targets"]
+    A["Medical record (EHR)<br/>age, HbA1c, kidney function,<br/>medicines, history, genotype"] --> C["Combine with each<br/>15-minute window"]
+    B["Sensors, last 2 h<br/>glucose, heart rate, HRV,<br/>steps, sleep, carbs, insulin"] --> C
+    C --> D["34 numbers describing<br/>this moment"]
+    D --> E["Model 1: risk scores for a low<br/>below 70 or a high above 250<br/>within 2 h"]
+    D --> F["Model 2: glucose value<br/>in exactly 2 h"]
+    E --> G["Alert if a score crosses<br/>its threshold"]
+    F --> H["Forecast shown on the chart"]
 ```
 
-### Module 1: Live Monitor (The Cockpit)
-* **Real-Time Glucose Gauge**: Shows the patient's current sugar level (e.g. 135 mg/dL) with color-coded safety zones:
-  * 🟢 **Green (70–180 mg/dL)**: Safe Target Range ("Time in Range").
-  * 🟡 **Amber (> 180 or > 250 mg/dL)**: Hyperglycemic excursion.
-  * 🔴 **Red (< 70 mg/dL)**: Dangerous Hypoglycemia.
-* **Timeline Scrubber**: Allows doctors to travel backward or forward in time in 15-minute intervals to review how heart rate, steps, and meals interacted throughout the day.
-* **2-Hour AI Warning Card**: Displays the predicted sugar level 120 minutes in advance, along with an AI confidence rating (e.g. `93.4% Confidence`).
-* **Emergency Rescue Protocol**: If a crash is forecasted, it displays exact clinical guidance (e.g. *"Administer 15–20g fast-acting carbohydrates. Recheck in 15 minutes."*).
+### Step 1: two kinds of information
 
-### Module 2: "What-If" Counterfactual Simulator (The Sandbox)
-This is the heart of the "Digital Twin" concept. Instead of experimenting on the human body with trial-and-error, patients and doctors can test scenarios virtually:
-* *"What if I eat 2 rotis with dal (50g carbs)?"*
-* *"What if I go for a 30-minute brisk walk right after?"*
-* *"What if my insulin dose is adjusted by 2 units?"*
+- **Who the patient is (static).** 16 items from the record: age, gender, BMI, years with diabetes, HbA1c, fasting glucose, blood pressure, kidney function (eGFR), diet pattern, main medicine, insulin regimen, risk tier, number of lows in the past year, family history of diabetes, and a genetic marker (the TCF7L2 rs7903146 risk-allele count).
+- **What is happening now (dynamic).** 18 items from the sensors and logs: current glucose and how fast it changed over the last 15 and 30 minutes, the average and spread of glucose over the last hour, heart rate and HRV now and over the last hour, steps over 15 minutes, 1 hour and 2 hours, carbohydrates and insulin now and over the last 2 hours, the hour of the day, and sleep stage (awake, light, deep or REM).
 
-The simulator calculates and draws two side-by-side curves:
-1. **Dotted Gray Line**: What will happen if you do nothing (status quo).
-2. **Solid Colored Line**: What your blood sugar will do under the new scenario.
-3. **Delta Metric Cards**: Instantly reveals if the plan improves your Time-in-Range or if it risks a crash.
+### Step 2: speed matters, not just the number
 
-### Module 3: Wearable & Sensor Data Ingest (The Data Bridge)
-Patients wear different gadgets—some use an **Abbott FreeStyle Libre** continuous glucose sensor on their arm, others use a **Dexcom**, and many track activity using an Apple Watch, Fitbit, or Android phone.
+A glucose of 110 mg/dL means different things if it was 100 fifteen minutes ago (gently rising) or 160 (falling fast). That is why the model gets the recent change and the recent average as well as the current value.
 
-This module allows clinicians to drag-and-drop raw sensor export files. The system automatically performs a **5-step automated health inspection**:
-1. Checks for required time and glucose columns.
-2. Sorts readings chronologically.
-3. Identifies missing gaps or signal dropouts.
-4. Removes duplicate readings.
-5. Verifies biological plausibility (flags impossible sensor values outside 40–400 mg/dL).
+### Step 3: the models
 
-### Module 4: Population & Cohort Analytics (The Hospital View)
-Hospitals and endocrinologists often oversee hundreds of diabetic patients at once. They cannot watch 200 screens simultaneously.
+GlycoTwin uses **gradient-boosted decision trees** (scikit-learn's `HistGradientBoosting`). A decision tree asks a chain of yes/no questions, for example "Is glucose below 95? Is it falling? Is the patient on a sulfonylurea? Is it early morning?". Boosting builds many small trees one after another, and each new tree corrects the mistakes of the trees before it. There are two models:
 
-This section stratifies an entire patient population:
-* Identifies the **High-Risk Cohort** (the 5%–10% of patients with unstable glucose or failing kidney function).
-* Displays baseline HbA1c distributions compared against the American Diabetes Association (**ADA 7.0% target**).
-* Visualizes the complete end-to-end data pipeline from skin sensors to hospital records.
+1. **The event model** gives two risk scores: one for "a reading below 70 in the next 2 hours" and one for "a reading above 250 in the next 2 hours". An alert is raised when a score passes its threshold (0.51 for lows, 0.52 for highs). The thresholds were chosen using only the training patients, with catching events weighted above avoiding false alarms.
+2. **The forecast model** predicts one glucose value, exactly 2 hours ahead. The Streamlit chart joins "now" to that point with a dotted straight line, which is only a visual connection, not a minute-by-minute prediction. The standalone page shows just the single 2-hour point, with error bars of about ±11 mg/dL (the average error on unseen patients).
+
+The risk scores are **not** probabilities. Because events are rare, the model is trained to pay extra attention to them, which pushes the scores up. Read a score as "higher means more worrying, compared with the threshold", not as "a 0.8 score means an 80% chance".
+
+### Step 4: honest testing
+
+The 200 synthetic patients were split before training: 150 for training, and **50 the model never saw**. All the headline numbers come from those 50 unseen patients. As a second check, the whole process was repeated 5 times, each time training on a different 4/5 of all 200 patients and testing on the rest (cross-validation). The forecast error was about the same (11.08 mg/dL against 11.0), and so was the share of events caught. The share of alerts that were followed by an event (precision) was not: 37.1% in cross-validation against 52.3% on the 50 unseen patients for lows, and 51.8% against 36.4% for highs. Precision depends on how common the events are in the patients being tested, so it moves a lot between small groups of patients.
 
 ---
 
-## 4. How It Works Under the Hood (Step-by-Step)
+## 5. How well does it do? (on synthetic patients)
 
-Here is how GlycoTwin processes information in plain, simple terms:
-
-```mermaid
-sequenceDiagram
-    autonumber
-    actor Patient as 🏃 Patient (Wearable & Body)
-    participant Sensors as ⌚ Sensors (CGM + Watch)
-    participant Engine as ⚙️ Feature Engine
-    participant AI as 🧠 HistGradientBoosting AI
-    participant Screen as 💻 Doctor Dashboard
-
-    Patient->>Sensors: Glucose, Heart Rate, Steps, Meals
-    Sensors->>Engine: Stream 15-minute telemetry packets
-    Note over Engine: Calculates speed of drop (dG/dt)<br/>and 2-hour accumulated exertion
-    Engine->>AI: 31 Combined Biomarkers + Medical History
-    AI->>AI: Evaluates decision trees in parallel
-    AI->>Screen: Forecast: 62 mg/dL at +120m (93% confidence)
-    Screen->>Patient: 🚨 Early Warning: Drink 150ml fruit juice now!
-```
-
-### Step 1: Gathering Two Streams of Information
-GlycoTwin never looks at blood sugar in isolation. It combines two completely different sources of data:
-1. **The Static Foundation (Who You Are)**:
-   * Age, Gender, South-Asian adjusted Body Mass Index (BMI).
-   * Years with diabetes, baseline HbA1c, kidney function (eGFR), blood pressure.
-   * Prescribed medications (Metformin, Sulfonylureas, Basal/Bolus insulin).
-2. **The Dynamic Stream (What You Are Doing Right Now)**:
-   * Every 15 minutes, it checks continuous sugar level, heart rate, heart rate variability (stress levels), accelerometer steps, sleep state (deep sleep, REM, or awake), and meal logs.
-
-### Step 2: Calculating Speed and Momentum (Feature Engineering)
-A single glucose number doesn't tell the whole story. If your sugar is **110 mg/dL**, are you safe?
-* If it was **100 mg/dL** 15 minutes ago, you are gently rising ($+10$ mg/dL)—safe!
-* If it was **160 mg/dL** 15 minutes ago, you are plunging downwards ($-50$ mg/dL)—**you are heading into a crash!**
-
-GlycoTwin calculates:
-* **Velocity ($dG/dt$)**: How fast sugar is climbing or dropping over 15 and 30 minutes.
-* **Volatility (Standard Deviation)**: How wild the swings have been over the past hour.
-* **Metabolic Accumulation**: How many steps you took over the last 2 hours and how many carbohydrates are still digesting in your stomach.
-
-### Step 3: The AI Model (Why HistGradientBoosting?)
-GlycoTwin uses a fast, reliable, medically interpretable machine learning architecture called **Histogram-based Gradient Boosting** (`HistGradientBoosting` from `scikit-learn`):
-* **No "Hallucinations"**: Unlike generative AI chatbots that write poetry, this is a strict numerical decision tree algorithm trained exclusively on clinical biomarkers.
-* **How it thinks**: Imagine a panel of 100 specialized medical decision trees. Each tree asks a series of logical yes/no questions (e.g., *"Is velocity negative? Is insulin above 4 units? Is BMI below 24?"*). 
-* Each successive tree corrects the mistakes of the previous one. By combining their votes, the ensemble produces an ultra-precise prediction in less than **5 milliseconds**.
-
-### Step 4: The 2-Hour Forecast & Confidence Score
-Every 15 minutes, the AI generates two outputs:
-1. **Exact Projected Value**: The predicted glucose level in mg/dL at step $+120$ minutes.
-2. **Event Probability & Confidence**: The mathematical certainty (e.g. `93.4%`) that the patient will either stay safe, crash into hypoglycemia, or spike into severe hyperglycemia.
-
----
-
-## 5. Why It Matters for the Healthcare System
-
-| Traditional Clinical Care | With GlycoTwin |
+| Question | Answer on the 50 unseen patients |
 | :--- | :--- |
-| **Reactive**: Treated after the patient collapses or feels sick. | **Proactive**: Predicted and prevented 2 hours in advance. |
-| **Episodic**: Doctor reviews blood tests once every 3 to 6 months. | **Continuous**: Monitored automatically every 15 minutes. |
-| **Guesswork Titration**: "Try taking 4 units of insulin and see how you feel." | **Digital Simulation**: Test the exact insulin and meal response virtually first. |
-| **Hospital Emergency Burden**: Frequent admissions for hypoglycemic comas. | **Preventative Self-Care**: In-home rescue with simple fruit juice or light walking. |
+| How close is the 2-hour forecast? | Off by **11.0 mg/dL** on average. Simply assuming "glucose stays the same" is off by 20.8 mg/dL. |
+| How safe are the forecast errors? | 91.8% of forecasts are in Clarke Error Grid zone A (clinically accurate) and 7.6% in zone B (benign); 0.6% are in zone D (a dangerous miss: the forecast is in range while the real value is out of range). |
+| Of the windows followed by a low, how many got a low alert? | **73%** (336 of 458). |
+| Of the windows followed by a high, how many got a high alert? | **86%** (480 of 557). |
+| Low episodes warned 15 to 120 minutes ahead | **34 of 39** (87%). |
+| High episodes warned 15 to 120 minutes ahead | **42 of 43**. |
+| How often does it alarm? | About **0.36 low alarms and 0.58 high alarms per patient per day**. |
+| How many alarms are false? | **Most of them**: 69% of low alarms and 88% of high alarms were not followed by that event within 2 hours. |
+| Is it better than a simple rule? | Yes. The rule "glucose below 90 and falling" flags 43% of the windows followed by a low (the model: 73%), and "above 200 and rising" flags 41% of the windows followed by a high (the model: 86%). |
+| Does the medical record actually matter? | Yes, modestly. If each patient is given someone else's record, the forecast error rises from 11.0 to 16.1 mg/dL. Adding the record to the sensor data improves the forecast and low detection a little (cross-validated error 11.45 to 11.08 mg/dL). High detection is driven mainly by the sensors. |
+| How fast is it? | About 15 milliseconds per 15-minute window on an ordinary CPU. |
+
+Heart rate, HRV and sleep added little extra information in this synthetic data: removing them barely changed the results. The time of day helped a lot, because the simulated patients keep fairly regular routines.
 
 ---
 
-## 6. How to Access and Test GlycoTwin Today
+## 6. What GlycoTwin cannot do (yet)
 
-### 🌐 Live on the Internet
-Anyone with a web browser on a phone, tablet, or laptop can explore the complete application live:
-* **Production Link**: [https://glycotwin-app.web.app](https://glycotwin-app.web.app)
-* **Mirror Link**: [https://glycotwin-app.firebaseapp.com](https://glycotwin-app.firebaseapp.com)
+- **It has only seen synthetic patients.** The data comes from our own simplified simulator, which is not calibrated to real people. Good results here do not mean good results on real patients.
+- **Too many false alarms** for real-world use as it stands; the thresholds would need tuning with clinicians.
+- **No insulin users among the unseen patients.** Only 3 of the 200 synthetic patients use insulin, and all 3 were used for training.
+- **The What-If Sandbox is a set of simple rules**, not the AI model. The Streamlit version uses only BMI and fasting glucose from the record (plus an insulin slider for insulin users). The standalone page's version uses the model's precomputed forecast and whether the patient takes a sulfonylurea or insulin. The two rule sets differ, and neither has been checked against real data.
+- **It is not a medical device**, has not been clinically tested, and must not be used to make treatment or dosing decisions. Using it with real patients would need real-data validation, clinical trials and regulatory approval.
+- **Privacy.** Because only synthetic data is used, no personal health data is processed (designed with DPDP Act 2023 principles in mind).
 
-### 💻 Running Locally (For Developers)
-If you are developing or presenting offline:
+---
+
+## 7. Try it
+
+- Online (standalone page, a few demo patients): https://glycotwin-app.web.app. The same page is in the repository as `dashboard/index.html` and opens offline.
+- On your own computer, from the repository root:
+
 ```bash
-# 1. Standalone Browser Version (zero setup required)
-open dashboard/index.html
-
-# 2. Interactive Python / Streamlit Clinician App
-.venv_redesign/bin/streamlit run dashboard/app.py --server.port 8502
+python -m venv .venv
+source .venv/bin/activate          # Windows: .venv\Scripts\activate
+pip install -r requirements.txt
+streamlit run dashboard/app.py     # or: python run_dashboard.py
 ```
 
+Patients worth opening (all unseen in training): **IND-PAT-196** and **IND-PAT-080** (sulfonylurea users with lows), **IND-PAT-077** and **IND-PAT-066** (post-meal highs), and **IND-PAT-046** (stable, no events).
+
 ---
 
-## 7. Summary in One Sentence
+## 8. In one sentence
 
-> **GlycoTwin is an intelligent digital twin that continuously monitors wearable biosensors and patient medical history to predict diabetic emergencies 2 hours before they happen, allowing doctors and patients to prevent hospitalizations with proactive, personalized rescue protocols.**
+GlycoTwin is a research prototype that combines a patient's medical record with their live sensor data to give a doctor a 2-hour early warning of low or very high glucose. On synthetic patients it catches most episodes in advance, at the cost of many false alarms, and it has not yet been tested on real people.

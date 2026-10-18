@@ -12,12 +12,18 @@ The glucose simulator is a simple compartment model (carb absorption, insulin /
 sulfonylurea action, exercise, hepatic counter-regulation). Several EHR fields
 change the dynamics on purpose, so the static record carries real signal:
   - TCF7L2 risk alleles and HbA1c raise post-meal excursions,
-  - eGFR < 60 slows insulin / sulfonylurea clearance,
-  - insulin or sulfonylurea use, age and kidney function set hypoglycaemia
-    propensity, which also drives the recorded prior-hypo history.
+  - insulin or sulfonylurea use and age set hypoglycaemia propensity, which
+    also drives the recorded prior-hypo history.
+  - an eGFR < 60 pathway (slower insulin clearance, higher hypo propensity)
+    exists in the code, but no persona in the shipped seed has eGFR < 60, so it
+    never fires in the shipped data.
 Wearable physiology is coupled back too: short sleep raises next-day insulin
 resistance and lowers HRV, and low glucose triggers an adrenergic response
 (heart rate up, HRV down).
+
+Known quirks (kept so the shipped data stays reproducible; see README Limitations):
+the meal bolus is skipped when the basal-insulin slot coincides with a meal over
+30 g, and for early wake-ups the short-night resistance lands one day late.
 
 All parameters are illustrative. Population ranges are loosely informed by
 published Indian T2D literature but this is NOT a calibrated or validated
