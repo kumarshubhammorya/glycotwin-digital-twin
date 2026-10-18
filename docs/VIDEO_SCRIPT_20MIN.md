@@ -2,8 +2,8 @@
 
 Happiest Health Digital Twin Challenge 2026, Phase 1. Team Classy Leopards, Goa Institute of Management, Sanquelim, Goa.
 
-- **Required length:** at least 20 minutes. **Planned length:** about 27:24 at about 140 spoken words per minute, including about 3 minutes of clicks and typing; the spoken text alone is about 24:27. At 130 words per minute it runs to about 29:17; even rushed, at 160 words per minute, it is about 24:21. **Never stop the recording before 21:00 on the recorder's clock.**
-- **Spoken text:** 3,424 words in the main script (only the `>` lines are spoken), plus 247 words of reserve passages for when you are running short (section 4).
+- **Required length:** at least 20 minutes. **Planned length:** about 28:11 at about 140 spoken words per minute, including about 3 minutes of clicks and typing; the spoken text alone is about 25:14. At 130 words per minute it runs to about 30:07; even rushed, at 160 words per minute, it is about 25:02. **Never stop the recording before 21:00 on the recorder's clock.**
+- **Spoken text:** 3,532 words in the main script (only the `>` lines are spoken), plus 247 words of reserve passages for when you are running short (section 4).
 - **Presenters:** Shivam Raj (team leader), Shubham Kumar, Shiva Kumar Bachatty, Yashita Dube.
 - **What is shown:** the deck, a terminal and code editor, the Streamlit doctor dashboard (`dashboard/app.py`, running the trained model live), and the hosted standalone page [glycotwin-app.web.app](https://glycotwin-app.web.app).
 - **Repository:** [github.com/kumarshubhammorya/glycotwin-digital-twin](https://github.com/kumarshubhammorya/glycotwin-digital-twin)
@@ -23,9 +23,9 @@ Rules for everyone who speaks:
 | 0:00–3:39 | Shivam Raj | 1. Opening, the problem, why a digital twin | Deck: title and problem slides |
 | 3:39–8:07 | Shubham Kumar | 2. Data streams, simulator, model, evaluation design | Terminal (starts `evaluate.py`), then deck: architecture diagram |
 | 8:07–11:36 | Shubham Kumar | 3. Live code walkthrough | Code editor and terminal |
-| 11:36–20:37 | Shiva Kumar Bachatty | 4. Live demo of the doctor dashboard | Streamlit app, then the hosted page |
-| 20:37–25:32 | Yashita Dube | 5. Results, fusion evidence, limitations and safety | Streamlit Model Card |
-| 25:32–27:24 | Shivam Raj | 6. Roadmap, impact and close | Deck: closing slide |
+| 11:36–21:14 | Shiva Kumar Bachatty | 4. Live demo of the doctor dashboard | Streamlit app, then the hosted page |
+| 21:14–26:18 | Yashita Dube | 5. Results, fusion evidence, limitations and safety | Streamlit Model Card |
+| 26:18–28:11 | Shivam Raj | 6. Roadmap, impact and close | Deck: closing slide |
 
 ---
 
@@ -179,7 +179,7 @@ The three editor views come first and the two terminal views last, so `evaluate.
 
 #### 3A · 8:07–9:00 · Where the design lives in the code
 
-**[SCREEN]** Code editor, `models/train_fusion_model.py`. **[DO]** Scroll and point, in order, at: `WEARABLE_FEATURES` and `EHR_FEATURES`; `compute_wearable_features`; `split_patients`; `make_models` (`class_weight="balanced"`); `choose_thresholds` (`GroupKFold`, `fbeta_score(..., beta=2.0)`); `encode_features` and `CATEGORY_LEVELS`.
+**[SCREEN]** Code editor, `models/train_fusion_model.py`. **[DO]** Scroll and point, in order, at: `WEARABLE_FEATURES` and `EHR_FEATURES`; `compute_wearable_features`; `split_patients`; `make_models` (`class_weight="balanced"`); `choose_thresholds` (`beta=2.0` in its signature, `GroupKFold`, `fbeta_score`); `encode_features` and `CATEGORY_LEVELS`.
 
 > Here is that design in the code, in models slash train fusion model dot py. These are the wearable and EHR feature lists. compute wearable features builds every rolling feature per patient from past rows only. split patients does the patient-level split. make models sets the balanced class weights. And choose thresholds picks the alert thresholds by F2 score on out-of-fold predictions, grouped by patient, from training patients only.
 >
@@ -232,7 +232,7 @@ If it is still running (you will see `Ablation …` lines appearing), open a sec
 
 > An hour later: 79.7 and falling fast. Heart rate 104, over a thousand steps in fifteen minutes. A morning walk, no breakfast logged, on a sulfonylurea.
 
-**[DO]** Click **+1 h**. *Expect* 08:00, CGM 49.8, chip "Level 2 hypoglycaemia (<54)", pill "CGM below 70 now", action text starting "CGM is 50 mg/dL now (Level 2 hypoglycaemia). Standard 15-15 rule …".
+**[DO]** Click **+1 h**. *Expect* 08:00, CGM 49.8, chip "Level 2 hypoglycaemia (<54)", red pill "Hypoglycaemia now (Level 2)" before the model-alert pill, card headline "Hypoglycaemia now (Level 2)" under "Current CGM reading · takes priority over the model", action text starting "CGM is 50 mg/dL now (Level 2 hypoglycaemia). Standard 15-15 rule …".
 
 > Eight o'clock: 49.8, Level 2. Only because the CGM is below 70 now does the card show the rescue step: 15 grams of fast-acting carbohydrate, recheck in 15 minutes, inform the care team. GlycoTwin never suggests insulin doses.
 
@@ -244,23 +244,23 @@ If it is still running (you will see `Ablation …` lines appearing), open a sec
 
 > Here is one. Saturday, six in the morning, a high score, but his lowest reading in the next two hours was exactly 70, not below it. The low came fifteen minutes later. By our strict two-hour rule that is a false alarm, and we count it.
 
-#### 4B · 14:49–15:59 · What-If Sandbox (rule-based)
+#### 4B · 14:49–16:36 · What-If Sandbox (rule-based)
 
-**[DO]** Click **What-If Sandbox** in the sidebar. *Expect* start point CGM 97.5 at Day 5 06:00; defaults "Extra meal carbohydrate (g)" 50, "Brisk walk after the meal (min)" 0, Horizon 4 h; "Simulated peak" 192 mg/dL at +1 h; amber note.
+**[DO]** Click **What-If Sandbox** in the sidebar. *Expect* the same replay time, "Day 5 · Sat 05 Sep 06:00" (the sandbox curve starts from his CGM there, 97.5); a red strip "ML model at this window (Sat 05 Sep 06:00): hypoglycaemia risk alert · hypo score 0.92 (alert ≥ 0.51) · hyper score 0.00 (alert ≥ 0.52) · forecast glucose at +2 h 88 mg/dL"; defaults "Extra meal carbohydrate (g)" 50, "Brisk walk after the meal (min)" 0, Horizon 4 h; "Time in 70–180 (simulated)" 82%; "Simulated peak" 192 mg/dL at +1 h; a dark diamond on the chart for "ML model forecast at +2 h". **[DO]** Scroll down a little until the note under the chart is in view. *Expect* a red note headed "ML model alert at this window (not a recommendation)", ending "Simulated peak 192 mg/dL is above the 180 mg/dL target at +1 h."
 
 > The What-If sandbox says it in its title: rule-based, illustrative, not the ML model, not a dosing tool. It starts from the current CGM, uses only BMI and fasting glucose from the record, and ignores medication, so it can disagree with the model.
 >
-> By default it adds a 50 gram meal and looks four hours ahead. The peak goes above 180, and the note suggests a smaller portion or a walk after the meal.
+> That is why the red strip at the top shows what the ML model says for this same window: the hypo alert we just looked at, score 0.92, forecast 88. By default the sandbox adds a 50 gram meal and looks four hours ahead. The simulated peak is 192, above the 180 target, and the note under the chart puts the model's alert first.
 
-**[DO]** Click the walk slider's handle and press the right-arrow key 6 times (30 min). *Expect* peak 172, time in 70–180 100%, green note.
+**[DO]** Click the walk slider's handle and press the right-arrow key 6 times (30 min). *Expect* "Simulated peak" 172 mg/dL, "Time in 70–180 (simulated)" 100% in green, and the note still red and still headed "ML model alert at this window", now without the peak sentence.
 
-> With a 30-minute walk, the curve stays within 70 to 180.
+> With a 30-minute walk, the simulated curve stays within 70 to 180 the whole time. But the note stays red. The model is still alerting at this window, and these rules know nothing about his sulfonylurea, so the page says it plainly: an in-range sandbox curve is not reassurance. We built it so that a comforting simulation can never hide a model alert.
 
-**[DO]** Set the meal slider to 0 (click its handle, press Home) and the walk slider to 60 (press the right-arrow key 6 more times). *Expect* "Simulated lowest" 58 mg/dL and a red note ending "Review this scenario with the care team."
+**[DO]** Set the meal slider to 0 (click its handle, press Home). Then click the walk slider's handle again and press the right-arrow key 6 more times (60 min). *Expect* "Simulated lowest" 58 mg/dL with "Level 1 hypoglycaemia (54–69)", and the red note ending "Simulated lowest value 58 mg/dL (below 70) at +1h15. Review this scenario with the care team."
 
-> With no meal but an hour's walk, the lowest value drops below 70, and the note says: review this scenario with the care team. For insulin users an illustrative insulin input appears too; it shows the shape of an effect, never a dose.
+> With no meal but an hour's walk, the simulated lowest value is 58, below 70, and the note adds: review this scenario with the care team. For insulin users an illustrative insulin input appears too; it shows the shape of an effect, never a dose.
 
-#### 4C · 15:59–17:24 · Live Monitor: marked hyperglycaemia (IND-PAT-077)
+#### 4C · 16:36–18:01 · Live Monitor: marked hyperglycaemia (IND-PAT-077)
 
 **[DO]** Click **Live Monitor**. Click the patient box in the sidebar, type `077`, press Enter. Drag the replay slider all the way to the left (Day 1 · Tue 01 Sep 00:00), then click **Next alert ▶**. *Expect* Day 1 11:00, CGM 176.9, amber pill "Model alert: marked hyperglycaemia risk within 2 h", hyper score 0.72, verdict "false alarm".
 
@@ -270,17 +270,17 @@ If it is still running (you will see `Ablation …` lines appearing), open a sec
 
 > At noon he is at 168 and drifting down, no meal logged. Yet the hyper score is 0.95 and the two o'clock forecast is 243. This time the alert was correct: lunch came at one, and he went above 250. The model expected lunch partly from his profile and partly from the hour of day, because routines are regular in our simulator. Yashita will show how much it leans on that.
 
-**[DO]** Click **+1 h** twice. *Expect* 14:00, CGM 264.0, pill "CGM above 250 now", chip "Marked hyperglycaemia (>250)".
+**[DO]** Click **+1 h** twice. *Expect* 14:00, CGM 264.0, amber pill "Marked hyperglycaemia now" before the model-alert pill, red chip "Marked hyperglycaemia (>250)", card headline "Marked hyperglycaemia now".
 
 > At two o'clock he is at 264. The card says to follow his hyperglycaemia plan and review the meal, missed doses and hydration with the care team.
 
-#### 4D · 17:24–17:57 · A stable patient (IND-PAT-046)
+#### 4D · 18:01–18:34 · A stable patient (IND-PAT-046)
 
 **[DO]** Patient box: type `046`, press Enter. *Expect* same time (Day 1 14:00), CGM 211.5 rising, amber chip "Above range (181–250)", green pill "No model alert", hyper score 0.01, verdict "correct: no event"; **◀ Prev alert** and **Next alert ▶** greyed out.
 
 > For contrast, IND-PAT-046, Sunita Rao, 62, on lifestyle measures and low-dose metformin, also held out. At the same moment she is at 211 after lunch, above range and shown in amber, but there is no alert: the model expects her to stay below 250, and the check agrees. Her alert buttons are greyed out, because the model raised no alert for her all week.
 
-#### 4E · 17:57–19:02 · Data Ingest and the five checks
+#### 4E · 18:34–19:39 · Data Ingest and the five checks
 
 **[DO]** Click **Data Ingest**. Click **Load sample: first 48 readings of IND-PAT-046**. *Expect* green "Accepted: sample: first 48 readings of IND-PAT-046 passed all 5 checks.", five PASS badges, and a green model card "No event predicted within 2 h".
 
@@ -290,7 +290,7 @@ If it is still running (you will see `Ablation …` lines appearing), open a sec
 
 > Now a file we broke on purpose: one glucose value of 900 and one blank. Rejected: bounds and rate of change fail, and the blank gives a warning. A rejected file is never scored.
 
-#### 4F · 19:02–19:51 · Cohort and 2-hour risk board
+#### 4F · 19:39–20:28 · Cohort and 2-hour risk board
 
 **[DO]** Click **Cohort & Risk Board**. *Expect* tiles "Synthetic personas 200 · 200 with 7-day wearable streams · 50 held-out"; board time Tue 01 Sep 14:00; pills "0 hypoglycaemia-risk alerts" and "21 marked-hyperglycaemia-risk alerts". Switch on **Held-out (unseen) patients only**. *Expect* IND-PAT-077 at the top with "HYPER risk".
 
@@ -300,7 +300,7 @@ If it is still running (you will see `Ablation …` lines appearing), open a sec
 
 > From the board I can open any patient. IND-PAT-066 opens at the same moment, with a hyper alert at 234, and the check says false alarm: high, but never above 250. That is alarm burden up close.
 
-#### 4G · 19:51–20:37 · The hosted standalone page
+#### 4G · 20:28–21:14 · The hosted standalone page
 
 **[DO]** Switch to browser tab 2, `https://glycotwin-app.web.app`. *Expect* black disclaimer strip; IND-PAT-196 at 2026-09-02 07:00 ("· day 2 of 7 · window …"); CGM 84.2 falling; "Hypo alert (next 2 h)"; hypo risk score 0.994; "What actually happened" box showing a reading below 70. **[DO]** Scroll to "7-day replay overview: tap a point to jump there" and click a red triangle.
 
@@ -308,15 +308,15 @@ If it is still running (you will see `Ablation …` lines appearing), open a sec
 
 ### Segment 5: Results, fusion evidence, limitations and safety (Yashita Dube)
 
-#### 5A · 20:37–21:42 · The two-hour forecast against baselines
+#### 5A · 21:14–22:19 · The two-hour forecast against baselines
 
-**[DO]** Switch to browser tab 1. Click **Model Card**. *Expect* tiles "+2 h forecast MAE (held-out) 11.0 mg/dL · persistence 20.8 · linear 35.2", "Clarke zone A · A+B 91.8% · A+B 99.4% · D 0.6%".
+**[DO]** Switch to browser tab 1. Click **Model Card**. *Expect* tiles "+2 h forecast MAE (held-out) 11.0 mg/dL · persistence 20.8 · linear 35.2" and "Clarke zone A (held-out) 91.8% · A+B 99.4% · D 0.6%".
 
 > Thank you, Shiva. The Model Card reads everything from metrics dot json. Held-out means the 50 patients the model never saw, 33,200 windows. And it is all synthetic, so these numbers describe how well the model learns our simulator, not how it would do on real patients.
 >
 > The two-hour forecast error is 11.0 milligrams per decilitre. Assuming glucose stays the same gives 20.8, and extending the last 15-minute trend gives 35.2. So the model roughly halves the error of the no-change baseline, with an R-squared of 0.803. On the Clarke error grid, 91.8 percent of forecasts fall in zone A and 7.6 percent in zone B, so 99.4 percent combined, from the same file. But zone D is 0.6 percent, not zero, and the no-change baseline already puts 79.1 percent in zone A, so A plus B alone does not separate models well.
 
-#### 5B · 21:42–23:11 · Alerts, episodes and the alarm burden
+#### 5B · 22:19–23:57 · Alerts, episodes and the alarm burden
 
 **[DO]** Scroll to "2-h event alerts: held-out patients", then to "Episodes and alarm burden: held-out patients".
 
@@ -326,7 +326,7 @@ If it is still running (you will see `Ablation …` lines appearing), open a sec
 >
 > Cross-validation over all 200 patients gives a similar forecast error, 11.08, and similar sensitivity: 75.5 percent for hypo and 82.5 for hyper. Precision does not match: 37.1 percent for hypo and 51.8 for hyper, so precision depends on which patients are tested.
 
-#### 5C · 23:11–24:16 · Does fusing the EHR help?
+#### 5C · 23:57–25:02 · Does fusing the EHR help?
 
 **[DO]** Scroll to "Ablation: which inputs matter" and "EHR-swap test".
 
@@ -334,7 +334,7 @@ If it is still running (you will see `Ablation …` lines appearing), open a sec
 >
 > Second, the EHR swap: we score each held-out patient with someone else's record. The error rises from 11.0 to 16.13, and hypo PR-AUC falls from 0.621 to 0.435. Give the twin the wrong record and it gets worse, so it really uses the record.
 
-#### 5D · 24:16–25:32 · Limitations and safety
+#### 5D · 25:02–26:18 · Limitations and safety
 
 **[DO]** Scroll to "Data and runtime" and "Limitations".
 
@@ -344,13 +344,13 @@ If it is still running (you will see `Ablation …` lines appearing), open a sec
 
 ### Segment 6: Roadmap, impact and close (Shivam Raj)
 
-#### 6A · 25:32–26:14 · Roadmap
+#### 6A · 26:18–27:01 · Roadmap
 
 **[SCREEN]** Deck, roadmap or closing slide.
 
 > Thank you, Yashita. Our next steps. First, real data: test on open Type 2 diabetes CGM datasets such as ShanghaiT2DM or CGMacros, after checking their licences, and build the record side with Synthea. Second, alarm burden: set thresholds by how many alarms a care team can act on, and calibrate the risk scores. Third, forecast the whole two-hour path with its uncertainty, and explain each alert. Fourth, native import of Dexcom, LibreView, Apple Health and Health Connect exports. And fifth, a consented pilot with an Indian diabetes clinic, and only then a regulatory pathway.
 
-#### 6B · 26:14–27:24 · Impact and close
+#### 6B · 27:01–28:11 · Impact and close
 
 **[SCREEN]** Deck, closing slide with team names, repository and hosted page (and the video link once it exists).
 
@@ -382,7 +382,7 @@ If it is still running (you will see `Ablation …` lines appearing), open a sec
 
 ## 5. After recording
 
-- [ ] Watch the whole recording once. Trim only dead air at the start and end. Confirm the final file is **longer than 21:00** (target 22 to 24 minutes).
+- [ ] Watch the whole recording once. Trim only dead air at the start and end. Confirm the final file is **longer than 21:00** (the plan above runs about 28 minutes, or about 25 if rushed).
 - [ ] If segments were recorded separately, join them and check the **joined** duration.
 - [ ] Upload to YouTube as **Unlisted**. Title: `GlycoTwin: multimodal digital twin for Type 2 diabetes | Team Classy Leopards, Goa Institute of Management | Happiest Health Digital Twin Challenge 2026`. Description: one paragraph, the repository link, and the line "Synthetic data only. Research prototype, not a medical device. Not for diagnosis or dosing decisions."
 - [ ] Wait for processing to finish, then open the link in a **logged-out (private) browser window**. Confirm it plays, the duration shown is over 20:00, and the audio is clear.
