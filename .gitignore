@@ -35,3 +35,8 @@ docs/~$*
 # OS
 .DS_Store
 Thumbs.db
+
+# Temporary handover bundles
+*.bundle
+*.zip
+docs/Claude updated codes/
