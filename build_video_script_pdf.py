@@ -460,10 +460,9 @@ def build_html_doc(body_content):
   <div class="hero-box">
     <div class="hero-tag">Happiest Health Digital Twin Challenge 2026 · Bengaluru, India</div>
     <div class="main-title">GlycoTwin: 20-Minute Video Script & Recording Blueprint</div>
-    <div class="hero-sub">Complete minute-by-minute teleprompter, stage directions, and demonstration guide for Team Classy Leopards</div>
+    <div class="hero-sub">Complete minute-by-minute teleprompter, stage directions, and demonstration guide</div>
     <div class="hero-meta">
-      <div><b>Team:</b> Classy Leopards</div>
-      <div><b>Institution:</b> Goa Institute of Management, Sanquelim</div>
+      <div><b>Project:</b> GlycoTwin (T2D Multimodal Digital Twin)</div>
       <div><b>Required Duration:</b> &ge; 20:00 (Planned: ~28:11)</div>
       <div><b>Live System:</b> glycotwin-app.web.app</div>
     </div>
