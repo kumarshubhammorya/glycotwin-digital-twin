@@ -146,7 +146,7 @@ Why gradient-boosted trees: the data is tabular and mixed (numbers plus categori
 
 The brief requires a video of **at least 20 minutes** that explains and demonstrates the prototype (a PPT recording or an unlisted YouTube video). Before submitting: upload it as *Unlisted*, check the uploaded duration is over 20 minutes, open the link in a logged-out browser to confirm it plays, and paste it on the line above.
 
-Script and demo plan: [`docs/VIDEO_SCRIPT_20MIN.md`](docs/VIDEO_SCRIPT_20MIN.md).
+Script and demo plan: [`docs/VIDEO_SCRIPT_20MIN.md`](docs/VIDEO_SCRIPT_20MIN.md) · **[Download Script as PDF (8 pages)](docs/GlycoTwin_Video_Script_20Min.pdf)**.
 
 ---
 
